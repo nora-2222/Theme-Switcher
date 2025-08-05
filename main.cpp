@@ -2,7 +2,13 @@
 #include <windows.h>
 #include <conio.h>
 
-using namespace std;
+using std::cout;
+using std::endl;
+using std::wcerr;
+
+const int LIGHT_THEME = 1;
+const int DARK_THEME = 2;
+const int EXIT = 0;
 
 void printMenu() {
   system("cls");
@@ -16,15 +22,17 @@ void printMenu() {
 
 bool changeTheme(int theme) {
   HKEY hKey;
-  DWORD value = (theme == 1) ? 1 : 0;
+  DWORD value = (theme == LIGHT_THEME) ? 1 : 0;
 
   const wchar_t* regPath = L"Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize";
 
-  if (RegOpenKeyEx(HKEY_CURRENT_USER, regPath, 0, KEY_SET_VALUE, &hKey) != ERROR_SUCCESS) {
+  LONG openResult = RegOpenKeyEx(HKEY_CURRENT_USER, regPath, 0, KEY_SET_VALUE, &hKey);
+  if (openResult != ERROR_SUCCESS) {
+    wcerr << L"Registry access failed. Error code: " << openResult << endl;
     return false;
   }
 
-  bool result = (RegSetValueEx(hKey, L"AppsUseLightTheme", 0, REG_DWORD, (BYTE*)&value, sizeof(value)) == ERROR_SUCCESS) &&
+  bool setResult = (RegSetValueEx(hKey, L"AppsUseLightTheme", 0, REG_DWORD, (BYTE*)&value, sizeof(value)) == ERROR_SUCCESS) &&
     (RegSetValueEx(hKey, L"SystemUsesLightTheme", 0, REG_DWORD, (BYTE*)&value, sizeof(value)) == ERROR_SUCCESS);
 
   RegCloseKey(hKey);
@@ -32,17 +40,18 @@ bool changeTheme(int theme) {
   SendMessage(HWND_BROADCAST, WM_SETTINGCHANGE, 0, (LPARAM)L"ImmersiveColorSet");
   SystemParametersInfoW(SPI_SETDESKWALLPAPER, 0, NULL, SPIF_UPDATEINIFILE | SPIF_SENDCHANGE);
 
-  return result;
+  return setResult;
 }
 
 void printResult(bool success) {
   if (success) {
-    cout << "\ncomplete.\n";
+    cout << "\nTheme changed successfully.\n";
   }
   else {
-    cout << "\nfailed.\n";
+    cout << "\nFailed to change theme.\n";
   }
   cout << "Press Enter to return to the menu...";
+
   char ch;
   do {
     ch = _getch();
@@ -51,20 +60,28 @@ void printResult(bool success) {
   cout << "\n";
 }
 
+char getValidChoice() {
+  char choice;
+  do {
+    printMenu();
+    choice = _getch();
+    if (choice != '0' && choice != '1' && choice != '2') {
+      cout << "\nInvalid selection. Please try again.\n";
+      Sleep(1000);
+    }
+  } while (choice != '0' && choice != '1' && choice != '2');
+  return choice;
+}
+
 int main() {
   while (true) {
-    char choice;
-
-    do {
-      printMenu();
-      choice = _getch();
-    } while (choice != '0' && choice != '1' && choice != '2');
-
+    char choice = getValidChoice();
     cout << choice << "\n";
 
     if (choice == '0') break;
+
     if (choice == '1' || choice == '2') {
-      bool success = changeTheme(choice - '0');
+      bool success = changeTheme(choice == '1' ? LIGHT_THEME : DARK_THEME);
       printResult(success);
     }
   }
